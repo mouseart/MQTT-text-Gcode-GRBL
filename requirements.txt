@@ -1,0 +1,3 @@
+paho-mqtt
+pyserial
+PyYAML # Added for reading config.yaml

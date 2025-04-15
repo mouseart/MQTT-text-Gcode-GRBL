@@ -1,0 +1,36 @@
+mqtt:
+  broker: "test.mosquitto.org" # Temporarily changed for testing
+  port: 1883
+  topic: "fablab/chaihuo/machine/text"
+  # username: "your_username" # Optional
+  # password: "your_password" # Optional
+
+grbl:
+  # --- IMPORTANT: Set serial_port to your device, e.g., "/dev/tty.usbmodemXXXX" or "COM3" ---
+  serial_port: /dev/tty.usbmodem212301 # Set to null or comment out to run in bypass mode
+  baud_rate: 115200
+  buffer_size: 128 # GRBL internal buffer size (usually 128 bytes)
+  init_commands:
+    - "$X"          # Unlock GRBL (If needed after reset/power cycle)
+    - "G21"         # Set units to millimeters
+    - "G90"         # Set to absolute positioning
+    - "G17"         # Select XY plane
+    - "G94"         # Set feed rate mode to units per minute
+    - "M3 S1000"    # Turn on spindle/laser (Adjust S value as needed)
+    - "G0 Z5"       # Move to safety height Z=5
+    - "G0 X0 Y0"    # Move to XY zero
+    - "G0 Z0"       # Move to Z zero
+  # Command sent after successfully processing an MQTT message (if message doesn't end with newline)
+  post_message_command: "G1 X0.00 Y-8.00"
+
+text_gcode:
+  # --- IMPORTANT: Set to the directory containing your .nc letter files ---
+  gcode_dir: "ascii_gcode"
+  # --- Other text-to-gcode parameters ---
+  line_length: 100.0
+  line_spacing: 8.0
+  padding: 1.5
+  # --- Pen control (Used by original Z-move logic, keep for reference or future use) ---
+  pen_up_height: 5.0
+  pen_down_depth: -1.0
+  feed_rate_z: 100
