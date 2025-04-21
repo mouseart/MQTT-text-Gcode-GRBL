@@ -206,13 +206,16 @@ def textToGcode(text, letters, line_length, line_spacing, padding):
     for line_text in lines:
         if not first_line:
             # Move down for next line
+            print(line_text)
             current_y -= line_spacing
             current_x = 0
             # Pen up before moving to the start of the new line
             if pen_is_down:
                 output.append("M05") # Pen Up before new line
                 pen_is_down = False
-            output.append(f"G0 X{current_x:.2f} Y{current_y:.2f}") # Move to start of new line
+            output.append(f"G0 F1500 X{current_x:.2f} Y{current_y:.2f}") # Move to start of new line
+            output.append("M04")
+            output.append("M05")
         else:
             first_line = False
 
@@ -241,25 +244,25 @@ def textToGcode(text, letters, line_length, line_spacing, padding):
                     
                     if instr.type == Instr.Type.move: # G0 Move
                         if pen_is_down:
-                            output.append("M05") # Pen Up before G0
+                            output.append("M05 F1500.0") # Pen Up before G0
                             pen_is_down = False
-                        output.append(f"G0 X{x:.2f} Y{y:.2f}")
+                        output.append(f"G0 F1500.0 X{x:.2f} Y{y:.2f}")
 
                     elif instr.type == Instr.Type.write: # G1 Move
                         if not pen_is_down:
-                            output.append("M03") # Pen Down before G1
+                            output.append("M03 S150") # Pen Down before G1
                             pen_is_down = True
-                        output.append(f"G1 X{x:.2f} Y{y:.2f}") # New G1 without Feed Rate
+                        output.append(f"G1 F1500.0 X{x:.2f} Y{y:.2f}") # New G1 without Feed Rate
 
                 # Pen up after finishing all instructions for the character
                 if pen_is_down:
-                    output.append("M05") # Ensure Pen Up after last instruction
+                    output.append("M05 F1500.0") # Ensure Pen Up after last instruction
                     pen_is_down = False
                     
                 # Update current_x for the next character
                 current_x += letter_data.width + padding
                 # Move G0 to the starting X of the next char - Pen should be up already
-                output.append(f"G0 X{current_x:.2f} Y{current_y:.2f}")
+                output.append(f"G0 F1000.0 X{current_x:.2f} Y{current_y:.2f}")
 
             else:
                 print(f"Warning: Character '{char}' not found in definitions. Skipping.")
@@ -286,6 +289,8 @@ def send_gcode(command, timeout=2.0):
     if ser and ser.is_open:
         try:
             print(f"[GCODE->GRBL] {command}")
+            if command == 'M04': #change line
+                time.sleep(19)
             ser.write((command + '\n').encode('utf-8'))
             ser.flush()
             start_time = time.time()
@@ -296,11 +301,12 @@ def send_gcode(command, timeout=2.0):
                     response_buffer += line
                     decoded_line = line.decode('utf-8', errors='ignore').strip()
                     print(f"[GRBL<-] {decoded_line}")
+                    time.sleep(1.1)
                     if decoded_line == 'ok' or decoded_line.startswith('error:'):
                         return decoded_line == 'ok', decoded_line
                 if time.time() - start_time > timeout:
                     final_response = response_buffer.decode('utf-8', errors='ignore').strip()
-                    print(f"[GRBL TIMEOUT] {final_response}")
+                    print(f"[GRBL TIMEOUT] {final_response} {final_response}")
                     return False, final_response
         except Exception as e:
             print(f"[GCODE ERROR] 发送到串口失败: {e}")
@@ -327,15 +333,19 @@ def init_grbl():
 
         # --- Send Initialization Sequence --- 
         init_commands = [
-            "$X",                 # Unlock GRBL (Needed after reset or power cycle)
+            #"$X",                 # Unlock GRBL (Needed after reset or power cycle)
             "G21",                # Set units to millimeters
             "G90",                # Set to absolute positioning
             "G17",                # Select XY plane
             "G94",                # Set feed rate mode to units per minute
-            "M3 S1000",           # Turn on spindle/laser (adjust S value as needed)
+            "M05 S1000",
+            "M03",           # Turn on spindle/laser (adjust S value as needed)
+            "M05",
+            "G10 P0 L20 X0",      # set X0
+            "G10 P0 L20 Y0",      # set Y0
             "G0 Z5",              # Move to safety height Z=5
             "G0 X0 Y0",           # Move to XY zero
-            "G0 Z0"               # Move to Z zero
+            "G0 Z0"              # Move to Z zero
         ]
 
         print("Sending GRBL initialization commands...")
@@ -451,8 +461,9 @@ def on_message(client, userdata, msg):
         # Only add the extra newline move if the original text didn't end with one
         if not text_payload.endswith('\n'):
             print("Sending post-message G-code (input did not end with newline)...")
-            post_cmd = "G1 X0.00 Y-8.00" # Move down for next potential line/area
+            post_cmd = "G1 F500.0 X0.00 Y-8.00" # Move down for next potential line/area
             post_success, post_response = send_gcode(post_cmd)
+            time.sleep(6)
             if not post_success:
                 print(f"Failed to execute post-message command: {post_cmd}. Response: {post_response}")
             else:

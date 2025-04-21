@@ -1,13 +1,13 @@
 mqtt:
-  broker: "test.mosquitto.org" # Temporarily changed for testing
+  broker: "broker.emqx.io" # Temporarily changed for testing
   port: 1883
   topic: "fablab/chaihuo/machine/text"
-  # username: "your_username" # Optional
-  # password: "your_password" # Optional
+  # username: "" # Optional
+  # password: "" # Optional
 
 grbl:
   # --- IMPORTANT: Set serial_port to your device, e.g., "/dev/tty.usbmodemXXXX" or "COM3" ---
-  serial_port: /dev/tty.usbmodem212301 # Set to null or comment out to run in bypass mode
+  serial_port: COM6 # Set to null or comment out to run in bypass mode
   baud_rate: 115200
   buffer_size: 128 # GRBL internal buffer size (usually 128 bytes)
   init_commands:
@@ -16,7 +16,11 @@ grbl:
     - "G90"         # Set to absolute positioning
     - "G17"         # Select XY plane
     - "G94"         # Set feed rate mode to units per minute
-    - "M3 S1000"    # Turn on spindle/laser (Adjust S value as needed)
+    - "M05 S1000"    # Turn on spindle/laser (Adjust S value as needed)
+    - "M03"          # Turn off spindle/laser
+    - "M05"
+    - "G10 P0 L20 X0"
+    - "G10 P0 L20 Y0"
     - "G0 Z5"       # Move to safety height Z=5
     - "G0 X0 Y0"    # Move to XY zero
     - "G0 Z0"       # Move to Z zero
